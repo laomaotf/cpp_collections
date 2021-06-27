@@ -4,5 +4,11 @@
 
 # code list
 
-[x] beam_decode: beam search    
-[x] regression: LSM线性拟合, SGD线性拟合
+
+|目录|内容|
+|----|----|
+|beam_decode|beam search
+|regression|LSM线性拟合, SGD线性拟合|
+|logistic regression|逻辑回归|
+|watermark|图像水印|
+
