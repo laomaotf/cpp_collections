@@ -1,2 +1,2 @@
-# cpp_collections
-c/c++ codes collection 
+# c/c++ collections
+收集的一些c/c++代码
