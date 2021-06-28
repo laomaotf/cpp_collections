@@ -11,4 +11,6 @@
 |regression|LSM线性拟合, SGD线性拟合|
 |logistic regression|逻辑回归|
 |watermark|图像水印|
+|dwt|二维小波|
+|contour_detection|边缘检测，边缘提取|
 
