@@ -13,4 +13,5 @@
 |watermark|图像水印|
 |dwt|二维小波|
 |contour_detection|边缘检测，边缘提取|
-
+|pca|主元分析PCA|
+|lda|fisher分类器|
