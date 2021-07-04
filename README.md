@@ -15,3 +15,4 @@
 |contour_detection|边缘检测，边缘提取|
 |pca|主元分析PCA|
 |lda|fisher分类器|
+|stroke_width_transform|文字检测|
