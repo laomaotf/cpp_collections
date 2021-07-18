@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <set>
 #include "boost/algorithm/string.hpp"
 #include "boost/lexical_cast.hpp"
 /// 决策树中不同特征选择策略并不会影响最终预测结果，决策树的目的应该只是构造尽量“有效”预测结构，但其预测效果其实是由训练集的代表性决定的。
@@ -138,7 +139,91 @@ void test_tree(basic_tree::CTree& tree, std::vector<std::vector<basic_tree::VALU
 	}
 	return;
 }
-int main(int argc, char* argv[])
+
+
+
+void test_forest(std::vector<basic_tree::CTree*>& forest, std::vector<std::vector<basic_tree::VALUE>>& X)
+{
+	std::vector< std::vector<std::map<int, float>> > preds_all;
+	std::set<int> output_classes;
+	for (auto tree : forest)
+	{
+		std::vector<std::map<int, float>> preds = tree->Evaluate(X);
+		for (auto& predx : preds)
+		{
+			for (auto& pair : predx)
+			{
+				output_classes.insert(pair.first);
+			}
+		}
+		preds_all.push_back(preds);
+	}
+
+	//soft-bagging
+	std::vector<std::vector<float>> probs_all;
+	{
+		for (int x = 0; x < X.size(); x++)
+		{
+			std::vector<float> probs;
+			std::vector<int> counts;
+			probs.resize(output_classes.size(), 0.0f);
+			counts.resize(output_classes.size(), 0);
+			for (int tree = 0; tree < preds_all.size(); tree++)
+			{
+				for (auto& pair : preds_all[tree][x])
+				{
+					int label = pair.first;
+					float prob = pair.second;
+					probs[label] += prob;
+					counts[label] += 1;
+				}
+			}
+			for (int c = 0; c < probs.size(); c++)
+			{
+				if (counts[c] < 1) continue;
+				probs[c] /= counts[c];
+			}
+			probs_all.push_back(probs);
+		}
+	}
+
+	if (X[0][0].dtype() == 0)
+	{//classification
+		float recalling = 0;
+		for (int k = 0; k < probs_all.size(); k++)
+		{
+			int pred_c = -1;
+			float pred_prob = -1;
+			for(int c = 0; c < probs_all[k].size(); k++)
+			{
+				if(probs_all[k][c] > pred_prob)
+				{
+					pred_c = c;
+					pred_prob = probs_all[k][c];
+				}
+			}
+			if (pred_c == X[k][0].i())
+			{
+				recalling += 1;
+			}
+		}
+		std::cout << "REC: " << recalling / X.size() << std::endl;
+	}
+	else if (X[0][0].dtype() == 1)
+	{
+		float MAPD = 0;
+		for (int k = 0; k < probs_all.size(); k++)
+		{
+			float err = std::abs(probs_all[k][0] - X[k][0].f());
+			MAPD += err / std::max<float>(1e-5, X[k][0].f());
+		}
+		std::cout << "MAPD: " << MAPD / X.size() << std::endl;
+	}
+
+	return;
+}
+
+int main_tree()
 {
 	std::map<std::string, DATA_CONFIG> data_config;
 	GetDataConfig(data_config);
@@ -166,4 +251,70 @@ int main(int argc, char* argv[])
 		test_tree(tree_object, testset);
 	}
 	return 0;
+}
+
+
+std::vector<std::vector<basic_tree::VALUE>> resample_dataset(std::vector<std::vector<basic_tree::VALUE>>& dataset, float ratio = 0.5)
+{
+	std::vector<std::vector<basic_tree::VALUE>>  output;
+	for (int k = 0; k < dataset.size(); k++)
+	{
+		if (  (rand() % 100) / 100.0   > ratio)
+		{
+			output.push_back(dataset[k]);
+		}
+	}
+	return output;
+}
+
+int main_forest(int tree_total, unsigned long seed,float resample_ratio)
+{
+	srand(seed);
+	std::map<std::string, DATA_CONFIG> data_config;
+	GetDataConfig(data_config);
+
+	std::vector<std::vector<basic_tree::VALUE>> trainset, testset;
+	basic_tree::CTrainParam param;
+
+	std::string root_dir(getenv("DATASET_ROOT_DIR"));
+	root_dir += "house_price\\";
+	load_data(root_dir, data_config, trainset, testset);
+	param.loss_type = "gini";
+	param.min_std = 0.1;
+
+	{
+		std::vector<basic_tree::CTree*> forest;
+		for (int tree_index = 0; tree_index < tree_total; tree_index++)
+		{
+			std::cout << "training tree " << tree_index + 1 <<"/"<<tree_total << std::endl;
+			basic_tree::CTree* tree_object = new basic_tree::CTree();
+			std::vector<std::vector<basic_tree::VALUE>>  trainset_down = resample_dataset(trainset,resample_ratio);
+			param.max_depth = 10;
+			tree_object->Train(trainset_down, param);
+			forest.push_back(tree_object);
+		}
+		// test
+		std::cout << "max depth:" << param.max_depth << std::endl;
+		std::cout << "-------evaluate trainset----------" << std::endl;
+		test_forest(forest, trainset);
+		std::cout << "-------evaluate testset----------" << std::endl;
+		test_forest(forest, testset);
+
+		for (auto tree : forest)
+		{
+			delete tree;
+		}
+	}
+	return 0;
+}
+
+
+int main(int argc, char* argv[])
+{
+	//return main_tree();
+
+	unsigned long seed = (unsigned long)time(0);
+	int tree_total = 10;
+	float ratio = 0.5f;
+	return main_forest(tree_total, seed, ratio);
 }

@@ -120,6 +120,10 @@ namespace basic_tree
 				if (one != NULL)  delete one;
 			}
 		}
+		CTree(const CTree& tree)
+		{
+
+		}
 	public:
 		CNode* create_node()
 		{
